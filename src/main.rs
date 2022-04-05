@@ -149,7 +149,9 @@ fn get_secret_value(arn: &str) -> Result<String> {
     let output_str = std::str::from_utf8(&output.stdout)?;
     let secret: Secret = serde_json::from_str(output_str)?;
     Ok(
-        match serde_json::from_str::<serde_json::Value>(secret.value.as_ref().unwrap()) {
+        match serde_json::from_str::<serde_json::Value>(
+            secret.value.as_ref().unwrap_or(&"".to_string()),
+        ) {
             Ok(s) => to_colored_json_auto(&s)?,
             Err(_) => secret.value.unwrap_or_else(|| "".to_string()),
         },
