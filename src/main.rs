@@ -1,4 +1,4 @@
-use anyhow::{bail, Result};
+use anyhow::Result;
 use clap::{Parser, Subcommand};
 use colored_json::to_colored_json_auto;
 use serde::Deserialize;
@@ -72,6 +72,7 @@ fn main() {
 fn search_cmd(search_string: String) -> Result<()> {
     let secrets = search_secrets(search_string)?;
 
+    check_results(&secrets);
     for s in secrets.list {
         println!(
             "{}: {}",
@@ -108,9 +109,8 @@ fn select_secret(search_string: String) -> Result<Secret> {
     let mut secrets = search_secrets(search_string)?;
     let i: usize;
 
-    if secrets.list.is_empty() {
-        bail!("Search did not return any secrets.")
-    }
+    check_results(&secrets);
+
     if secrets.list.len() > 1 {
         eprintln!("Multiple secrets were found");
         secrets.list.iter().enumerate().for_each(|(i, s)| {
@@ -164,4 +164,11 @@ fn read_int() -> Result<usize> {
     stdout().flush()?;
     stdin().read_line(&mut input)?;
     Ok(input.trim().parse()?)
+}
+
+fn check_results(secrets: &SecretList) {
+    if secrets.list.is_empty() {
+        eprintln!("Your search did not return any results");
+        exit(1);
+    }
 }
