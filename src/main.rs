@@ -4,7 +4,8 @@ use colored_json::to_colored_json_auto;
 use serde::Deserialize;
 use serde::Serialize;
 use std::process::exit;
-use std::process::Command;
+
+use asm::AwsSM;
 
 #[derive(Parser, Debug)]
 #[clap(author, version, about)]
@@ -21,11 +22,14 @@ enum Commands {
         search_string: String,
     },
     /// Get the value of a secret
+    #[clap(alias("g"))]
+    #[clap(alias("get"))]
     GetValue {
         /// The string to search on
         search_string: String,
     },
     /// Search for secrets by name
+    #[clap(alias("s"))]
     Search {
         /// The string to search on
         search_string: String,
@@ -88,12 +92,8 @@ fn search_and_get_value(search_string: String) -> Result<()> {
 
 /// Returns a list of secrets containing `search_string` in their name.
 fn search_secrets(search_string: String) -> Result<SecretList> {
-    let mut aws_sm = Command::new("aws");
-    aws_sm.arg("secretsmanager").arg("list-secrets");
-
-    let output = aws_sm.output()?;
-    let output_str = std::str::from_utf8(&output.stdout)?;
-    let mut secrets: SecretList = serde_json::from_str(output_str)?;
+    let output = AwsSM::new("list-secrets").run();
+    let mut secrets: SecretList = serde_json::from_str(&output)?;
     secrets.list.retain(|s| {
         s.name
             .to_lowercase()
@@ -112,11 +112,11 @@ fn select_secret(search_string: String) -> Result<Secret> {
         bail!("Search did not return any secrets.")
     }
     if secrets.list.len() > 1 {
-        println!("Multiple secrets were found");
+        eprintln!("Multiple secrets were found");
         secrets.list.iter().enumerate().for_each(|(i, s)| {
-            println!("{}: {}", i, s.name);
+            eprintln!("{}: {}", i, s.name);
         });
-        print!("\nSelect secret: ");
+        eprint!("\nSelect secret: ");
         match read_int() {
             Ok(input) => {
                 let max_idx = secrets.list.len() - 1;
@@ -128,7 +128,7 @@ fn select_secret(search_string: String) -> Result<Secret> {
                 }
             }
             Err(_) => {
-                println!("Please enter an integer value");
+                eprintln!("Please enter an integer value");
                 exit(1);
             }
         }
@@ -140,14 +140,12 @@ fn select_secret(search_string: String) -> Result<Secret> {
 
 /// Returns the secret value for a given ARN.
 fn get_secret_value(arn: &str) -> Result<String> {
-    let mut aws_sm = Command::new("aws");
-    aws_sm
-        .arg("secretsmanager")
-        .arg("get-secret-value")
-        .args(["--secret-id", arn]);
-    let output = aws_sm.output()?;
-    let output_str = std::str::from_utf8(&output.stdout)?;
-    let secret: Secret = serde_json::from_str(output_str)?;
+    let output = AwsSM::new("get-secret-value")
+        .args(["--secret-id", arn])
+        .run();
+    let secret: Secret = serde_json::from_str(&output)?;
+
+    // If the secret value is json serializable, parse it. Otherwise, return the string
     Ok(
         match serde_json::from_str::<serde_json::Value>(
             secret.value.as_ref().unwrap_or(&"".to_string()),
