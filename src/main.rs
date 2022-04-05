@@ -1,4 +1,4 @@
-use anyhow::Result;
+use anyhow::{bail, Result};
 use clap::{Parser, Subcommand};
 use colored_json::to_colored_json_auto;
 use serde::Deserialize;
@@ -9,18 +9,27 @@ use std::process::Command;
 #[derive(Parser, Debug)]
 #[clap(author, version, about)]
 struct Cli {
-    // #[clap(short, long)]
-    // quiet_flag: bool,
     #[clap(subcommand)]
     command: Commands,
 }
 
 #[derive(Subcommand, Debug)]
 enum Commands {
-    GetArn,
-    GetValue { search_string: String },
-    // The string to search on
-    Search { search_string: String },
+    /// Get the ARN of a secret
+    GetArn {
+        /// The string to search on
+        search_string: String,
+    },
+    /// Get the value of a secret
+    GetValue {
+        /// The string to search on
+        search_string: String,
+    },
+    /// Search for secrets by name
+    Search {
+        /// The string to search on
+        search_string: String,
+    },
 }
 
 #[derive(Debug, Deserialize)]
@@ -45,15 +54,19 @@ fn main() {
     let cli = Cli::parse();
 
     match &cli.command {
-        Commands::GetArn => todo!(),
-        Commands::GetValue { search_string } => search_and_get_value(search_string.to_string()),
-        Commands::Search { search_string } => search_cmd(search_string.to_string()),
-    }
+        Commands::GetArn { search_string } => {
+            println!("{}", select_secret(search_string.to_string()).unwrap().arn);
+        }
+        Commands::GetValue { search_string } => {
+            search_and_get_value(search_string.to_string()).unwrap()
+        }
+        Commands::Search { search_string } => search_cmd(search_string.to_string()).unwrap(),
+    };
 }
 
 /// Prints a list of secrets containing `search_string`
-fn search_cmd(search_string: String) {
-    let secrets = search_secrets(search_string).unwrap();
+fn search_cmd(search_string: String) -> Result<()> {
+    let secrets = search_secrets(search_string)?;
 
     for s in secrets.list {
         println!(
@@ -62,14 +75,42 @@ fn search_cmd(search_string: String) {
             s.description.unwrap_or_else(|| "".to_string())
         );
     }
+    Ok(())
 }
 
 /// Gets a secret value by searching for secrets containing `search_string` and allowing the
 /// user to choose which secret to retrieve if more than one secret is found.
-fn search_and_get_value(search_string: String) {
-    let secrets = search_secrets(search_string).unwrap();
+fn search_and_get_value(search_string: String) -> Result<()> {
+    let selected_secret = select_secret(search_string)?;
+    println!("{}", get_secret_value(&selected_secret.arn)?);
+    Ok(())
+}
+
+/// Returns a list of secrets containing `search_string` in their name.
+fn search_secrets(search_string: String) -> Result<SecretList> {
+    let mut aws_sm = Command::new("aws");
+    aws_sm.arg("secretsmanager").arg("list-secrets");
+
+    let output = aws_sm.output()?;
+    let output_str = std::str::from_utf8(&output.stdout)?;
+    let mut secrets: SecretList = serde_json::from_str(output_str)?;
+    secrets.list.retain(|s| {
+        s.name
+            .to_lowercase()
+            .contains(&search_string.to_lowercase())
+    });
+    Ok(secrets)
+}
+
+/// Returns a secret from a list of secrets based on `search_string`. If more than one secret is
+/// returned from the search, the user is prompted to choose one.
+fn select_secret(search_string: String) -> Result<Secret> {
+    let mut secrets = search_secrets(search_string)?;
     let i: usize;
 
+    if secrets.list.is_empty() {
+        bail!("Search did not return any secrets.")
+    }
     if secrets.list.len() > 1 {
         println!("Multiple secrets were found");
         secrets.list.iter().enumerate().for_each(|(i, s)| {
@@ -94,33 +135,7 @@ fn search_and_get_value(search_string: String) {
     } else {
         i = 0;
     }
-    println!("{}", get_secret_value(&secrets.list[i].arn).unwrap())
-}
-
-/// Returns a list of secrets containing `search_string` in their name.
-fn search_secrets(search_string: String) -> Result<SecretList> {
-    let mut aws_sm = Command::new("aws");
-    aws_sm.arg("secretsmanager").arg("list-secrets");
-
-    let output = aws_sm.output()?;
-    let output_str = std::str::from_utf8(&output.stdout)?;
-    let mut secrets: SecretList = serde_json::from_str(output_str)?;
-    secrets.list.retain(|s| {
-        s.name
-            .to_lowercase()
-            .contains(&search_string.to_lowercase())
-    });
-    Ok(secrets)
-}
-
-/// Reads a usize integer from stdin.
-fn read_int() -> Result<usize> {
-    use std::io::{stdin, stdout, Write};
-    let mut input = String::new();
-
-    stdout().flush()?;
-    stdin().read_line(&mut input)?;
-    Ok(input.trim().parse()?)
+    Ok(secrets.list.remove(i))
 }
 
 /// Returns the secret value for a given ARN.
@@ -139,4 +154,14 @@ fn get_secret_value(arn: &str) -> Result<String> {
             Err(_) => secret.value.unwrap_or_else(|| "".to_string()),
         },
     )
+}
+
+/// Reads a usize integer from stdin.
+fn read_int() -> Result<usize> {
+    use std::io::{stdin, stdout, Write};
+    let mut input = String::new();
+
+    stdout().flush()?;
+    stdin().read_line(&mut input)?;
+    Ok(input.trim().parse()?)
 }
