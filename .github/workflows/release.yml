@@ -66,19 +66,19 @@ jobs:
         uses: actions/upload-release-asset@v1
         env: 
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          with:
-            upload_url: ${{ steps.create_release.outputs.upload_url }}
-            asset_path: ./uploads/asm-linux.tar.gz
-            asset_name: asm-linux.tar.gz
-            asset_content_type: application/gzip
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./uploads/asm-linux.tar.gz
+          asset_name: asm-linux.tar.gz
+          asset_content_type: application/gzip
 
       - name: upload linux mac
         id: upload-mac
         uses: actions/upload-release-asset@v1
         env: 
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          with:
-            upload_url: ${{ steps.create_release.outputs.upload_url }}
-            asset_path: ./uploads/asm-mac.zip
-            asset_name: asm-mac.zip
-            asset_content_type: application/zip
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./uploads/asm-mac.zip
+          asset_name: asm-mac.zip
+          asset_content_type: application/zip
