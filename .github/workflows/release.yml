@@ -71,7 +71,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ${{ steps.download_artifacts.outputs.download-path }}
+          asset_path: ${{ steps.download_artifacts.outputs.download-path }}/asm.tar.gz
           asset_name: asm-linux.tar.gz
           asset_content_type: application/gzip
 
@@ -82,6 +82,6 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ${{ steps.download_artifacts.outputs.download-path }}
+          asset_path: ${{ steps.download_artifacts.outputs.download-path }}/asm-mac.zip
           asset_name: asm-mac.zip
           asset_content_type: application/zip
