@@ -16,7 +16,7 @@ jobs:
     - name: build
       run: cargo build --release
     - name: make tarball
-      run: tar -czf asm-linux.tar.gz target/release/asm README.md
+      run: mkdir asm-linux && cp target/release/asm README.md && tar -czf asm-linux.tar.gz asm-linux
     - name: upload tarball
       uses: actions/upload-artifact@v3
       with:
@@ -30,7 +30,7 @@ jobs:
     - name: build
       run: cargo build --release
     - name: make zip
-      run: zip -r asm-mac.zip target/release/asm README.md
+      run: mkdir asm-mac && cp target/release/asm README.md && tar -czf asm-mac.tar.gz asm-mac
     - name: upload zip
       uses: actions/upload-artifact@v3
       with:
