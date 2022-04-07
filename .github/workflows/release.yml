@@ -30,7 +30,7 @@ jobs:
     - name: build
       run: cargo build --release
     - name: make zip
-      run: mkdir asm-mac && cp target/release/asm README.md asm-mac && tar -czf asm-mac.tar.gz asm-mac
+      run: mkdir asm-mac && cp target/release/asm README.md asm-mac && zip -r asm-mac.zip asm-mac
     - name: upload zip
       uses: actions/upload-artifact@v3
       with:
