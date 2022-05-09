@@ -4,6 +4,7 @@ use colored_json::to_colored_json_auto;
 use serde::Deserialize;
 use serde::Serialize;
 use std::process::exit;
+use tabled::{Alignment, Full, Modify, Style, Table, Tabled};
 
 use asm::AwsSM;
 
@@ -34,6 +35,10 @@ enum Commands {
         /// The string to search on
         search_string: String,
     },
+
+    /// List all available secrets
+    #[clap(alias("l"))]
+    List,
 }
 
 #[derive(Debug, Deserialize)]
@@ -54,6 +59,22 @@ struct Secret {
     value: Option<String>,
 }
 
+impl Tabled for Secret {
+    const LENGTH: usize = 2;
+
+    fn fields(&self) -> Vec<String> {
+        let desc = match &self.description {
+            Some(d) => d,
+            None => "",
+        };
+        vec![self.name.clone(), desc.to_string()]
+    }
+
+    fn headers() -> Vec<String> {
+        vec!["Name".to_string(), "Description".to_string()]
+    }
+}
+
 fn main() {
     let cli = Cli::parse();
 
@@ -65,6 +86,7 @@ fn main() {
             search_and_get_value(search_string.to_string()).unwrap()
         }
         Commands::Search { search_string } => search_cmd(search_string.to_string()).unwrap(),
+        Commands::List => list_cmd(),
     };
 }
 
@@ -73,14 +95,15 @@ fn search_cmd(search_string: String) -> Result<()> {
     let secrets = search_secrets(search_string)?;
 
     check_results(&secrets);
-    for s in secrets.list {
-        println!(
-            "{}: {}",
-            s.name,
-            s.description.unwrap_or_else(|| "".to_string())
-        );
-    }
+    print_secret_table(&secrets);
     Ok(())
+}
+
+fn print_secret_table(secrets: &SecretList) {
+    let table = Table::new(&secrets.list)
+        .with(Style::psql())
+        .with(Modify::new(Full).with(Alignment::left()));
+    println!("\n{}\n", table);
 }
 
 /// Gets a secret value by searching for secrets containing `search_string` and allowing the
@@ -171,4 +194,10 @@ fn check_results(secrets: &SecretList) {
         eprintln!("Your search did not return any results");
         exit(1);
     }
+}
+
+fn list_cmd() {
+    let output = AwsSM::new("list-secrets").run();
+    let secrets: SecretList = serde_json::from_str(&output).unwrap();
+    print_secret_table(&secrets);
 }
