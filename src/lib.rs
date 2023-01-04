@@ -80,7 +80,7 @@ pub fn list_secrets() -> Result<()> {
 
 /// Creates a new secret
 pub fn create_secret(secret_name: &str, description: &Option<String>) -> Result<()> {
-    let secret_file = Temp::new_file()?;
+    let secret_file = Temp::new_path();
     let secret_file_path = format!(
         "file://{}",
         &secret_file.to_str().expect("temp file should have path")
@@ -88,18 +88,22 @@ pub fn create_secret(secret_name: &str, description: &Option<String>) -> Result<
 
     edit_file(secret_file.as_path());
 
-    let mut args = vec![
-        "--name",
-        secret_name,
-        "--secret-string",
-        secret_file_path.as_str(),
-    ];
-    if let Some(desc) = description {
-        args.extend(vec!["--description", desc])
-    }
-    AwsSM::new("create-secret").args(args).run();
+    if Path::exists(secret_file.as_path()) {
+        let mut args = vec![
+            "--name",
+            secret_name,
+            "--secret-string",
+            secret_file_path.as_str(),
+        ];
+        if let Some(desc) = description {
+            args.extend(vec!["--description", desc])
+        }
+        AwsSM::new("create-secret").args(args).run();
 
-    println!("Created secret {}", secret_name);
+        println!("Created secret {}", secret_name);
+    } else {
+        println!("Aborting...")
+    }
 
     Ok(())
 }

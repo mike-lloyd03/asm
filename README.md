@@ -11,10 +11,12 @@ Returns a list of secrets that match the search term.
 ```bash
 $ asm search mySecret
 
- Name          | Description
----------------+---------------------
- dev/mySecret  | Development secret
- prod/mySecret | Production secret
+╭──────────────┬─────────────────────╮
+│Name          │ Description         │
+├──────────────┼─────────────────────┤
+│dev/mySecret  │ Development secret  │
+│prod/mySecret │ Production secret   │
+╰──────────────┴─────────────────────╯
 
 ```
 
@@ -42,13 +44,36 @@ List all secrets along with their description
 ```bash
 $ asm list
 
- Name            | Description
------------------+--------------------
- dev/mySecret    | Development secret
- prod/mySecret   | Production secret
- dev/extraSecret | Extra secret item
- prod/secretItem | Also secret item
+╭────────────────┬─────────────────────╮
+│Name            │ Description         │
+├────────────────┼─────────────────────┤
+│dev/mySecret    │ Development secret  │
+│prod/mySecret   │ Production secret   │
+│dev/extraSecret │ Extra secret item   │
+│prod/secretItem │ Also secret item    │
+╰────────────────┴─────────────────────╯
+```
 
+### Create a secret
+Opens the user's preferred text editor and creates a new secret from the editor's contents
+ 
+```bash
+$ asm create --description "This is a new secret" dev/mySecret
+```
+
+### Edit a secret
+Opens the user's preferred text editor to allow editing the new secret
+ 
+```bash
+$ asm edit dev/mySecret
+```
+
+### Delete a secret
+Deletes the specified secret. Asks for confirmation
+ 
+```bash
+$ asm delete dev/mySecret
+Are you sure you want to delete secret '{}' [y/N]? 
 ```
 
 ## Todo
