@@ -78,21 +78,19 @@ impl Tabled for Secret {
 fn main() {
     let cli = Cli::parse();
 
-    match &cli.command {
+    match cli.command {
         Commands::GetArn { search_string } => {
-            println!("{}", select_secret(search_string.to_string()).unwrap().arn);
+            println!("{}", select_secret(&search_string).unwrap().arn);
         }
-        Commands::GetValue { search_string } => {
-            search_and_get_value(search_string.to_string()).unwrap()
-        }
-        Commands::Search { search_string } => search_cmd(search_string.to_string()).unwrap(),
+        Commands::GetValue { search_string } => search_and_get_value(search_string).unwrap(),
+        Commands::Search { search_string } => search_cmd(search_string).unwrap(),
         Commands::List => list_cmd(),
     };
 }
 
 /// Prints a list of secrets containing `search_string`
 fn search_cmd(search_string: String) -> Result<()> {
-    let secrets = search_secrets(search_string)?;
+    let secrets = search_secrets(&search_string)?;
 
     check_results(&secrets);
     print_secret_table(&secrets);
@@ -109,13 +107,13 @@ fn print_secret_table(secrets: &SecretList) {
 /// Gets a secret value by searching for secrets containing `search_string` and allowing the
 /// user to choose which secret to retrieve if more than one secret is found.
 fn search_and_get_value(search_string: String) -> Result<()> {
-    let selected_secret = select_secret(search_string)?;
+    let selected_secret = select_secret(&search_string)?;
     println!("{}", get_secret_value(&selected_secret.arn)?);
     Ok(())
 }
 
 /// Returns a list of secrets containing `search_string` in their name.
-fn search_secrets(search_string: String) -> Result<SecretList> {
+fn search_secrets(search_string: &str) -> Result<SecretList> {
     let output = AwsSM::new("list-secrets").run();
     let mut secrets: SecretList = serde_json::from_str(&output)?;
     secrets.list.retain(|s| {
@@ -128,7 +126,7 @@ fn search_secrets(search_string: String) -> Result<SecretList> {
 
 /// Returns a secret from a list of secrets based on `search_string`. If more than one secret is
 /// returned from the search, the user is prompted to choose one.
-fn select_secret(search_string: String) -> Result<Secret> {
+fn select_secret(search_string: &str) -> Result<Secret> {
     let mut secrets = search_secrets(search_string)?;
     let i: usize;
 
