@@ -1,6 +1,6 @@
-use clap::{Parser, Subcommand};
+use std::process::exit;
 
-use asm::*;
+use clap::{Parser, Subcommand};
 
 #[derive(Parser, Debug)]
 #[clap(author, version, about)]
@@ -40,10 +40,23 @@ fn main() {
 
     match cli.command {
         Commands::GetArn { search_string } => {
-            println!("{}", select_secret(&search_string).unwrap().arn);
+            let secret = check_error(asm::select_secret(&search_string));
+            println!("{}", secret.arn);
         }
-        Commands::GetValue { search_string } => search_and_get_value(search_string).unwrap(),
-        Commands::Search { search_string } => search_cmd(search_string).unwrap(),
-        Commands::List => list_cmd(),
+        Commands::GetValue { search_string } => {
+            check_error(asm::search_and_get_value(&search_string))
+        }
+        Commands::Search { search_string } => check_error(asm::search_secret(&search_string)),
+        Commands::List => check_error(asm::list_secrets()),
     };
+}
+
+fn check_error<T>(result: anyhow::Result<T>) -> T {
+    match result {
+        Ok(r) => r,
+        Err(e) => {
+            eprintln!("ERROR: {}", e);
+            exit(1)
+        }
+    }
 }

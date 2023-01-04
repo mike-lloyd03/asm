@@ -3,7 +3,6 @@ use std::process::exit;
 use anyhow::Result;
 use colored_json::to_colored_json_auto;
 use serde::Deserialize;
-use serde_json::Value;
 use tabled::{object::Segment, Alignment, Modify, Style, Table};
 
 mod aws_sm;
@@ -12,49 +11,10 @@ mod secret;
 pub use aws_sm::AwsSM;
 pub use secret::*;
 
-/// Prints a list of secrets containing `search_string`
-pub fn search_cmd(search_string: String) -> Result<()> {
-    let secrets = search_secrets(&search_string)?;
-
-    check_results(&secrets);
-    print_secret_table(&secrets);
-    Ok(())
-}
-
-/// Prints a table with a list of secrets
-pub fn print_secret_table(secrets: &Vec<Secret>) {
-    let table = Table::new(secrets)
-        .with(Style::rounded())
-        .with(Modify::new(Segment::all()).with(Alignment::left()));
-    println!("\n{}\n", table);
-}
-
-/// Gets a secret value by searching for secrets containing `search_string` and allowing the
-/// user to choose which secret to retrieve if more than one secret is found.
-pub fn search_and_get_value(search_string: String) -> Result<()> {
-    let selected_secret = select_secret(&search_string)?;
-    println!("{}", get_secret_value(&selected_secret.arn)?);
-    Ok(())
-}
-
-/// Returns a list of secrets containing `search_string` in their name.
-fn search_secrets(search_string: &str) -> Result<Vec<Secret>> {
-    #[derive(Debug, Deserialize)]
-    pub struct SecretList {
-        #[serde(rename = "SecretList")]
-        pub list: Vec<Secret>,
-    }
-
-    let output = AwsSM::new("list-secrets").run();
-    let secret_list: SecretList = serde_json::from_str(&output)?;
-    let mut secrets: Vec<Secret> = secret_list.list;
-
-    secrets.retain(|s| {
-        s.name
-            .to_lowercase()
-            .contains(&search_string.to_lowercase())
-    });
-    Ok(secrets)
+#[derive(Debug, Deserialize)]
+pub struct SecretList {
+    #[serde(rename = "SecretList")]
+    pub list: Vec<Secret>,
 }
 
 /// Returns a secret from a list of secrets based on `search_string`. If more than one secret is
@@ -62,8 +22,6 @@ fn search_secrets(search_string: &str) -> Result<Vec<Secret>> {
 pub fn select_secret(search_string: &str) -> Result<Secret> {
     let mut secrets = search_secrets(search_string)?;
     let i: usize;
-
-    check_results(&secrets);
 
     if secrets.len() > 1 {
         eprintln!("Multiple secrets were found");
@@ -90,6 +48,50 @@ pub fn select_secret(search_string: &str) -> Result<Secret> {
         i = 0;
     }
     Ok(secrets.remove(i))
+}
+
+/// Prints a list of secrets containing `search_string`
+pub fn search_secret(search_string: &str) -> Result<()> {
+    let secrets = search_secrets(search_string)?;
+
+    print_secret_table(&secrets);
+    Ok(())
+}
+
+/// Prints a table with a list of secrets
+fn print_secret_table(secrets: &Vec<Secret>) {
+    let table = Table::new(secrets)
+        .with(Style::rounded())
+        .with(Modify::new(Segment::all()).with(Alignment::left()));
+    println!("\n{}\n", table);
+}
+
+/// Gets a secret value by searching for secrets containing `search_string` and allowing the
+/// user to choose which secret to retrieve if more than one secret is found.
+pub fn search_and_get_value(search_string: &str) -> Result<()> {
+    let selected_secret = select_secret(search_string)?;
+    println!("{}", get_secret_value(&selected_secret.arn)?);
+    Ok(())
+}
+
+/// Returns a list of secrets containing `search_string` in their name.
+fn search_secrets(search_string: &str) -> Result<Vec<Secret>> {
+    let output = AwsSM::new("list-secrets").run();
+    let secret_list: SecretList = serde_json::from_str(&output)?;
+    let mut secrets: Vec<Secret> = secret_list.list;
+
+    secrets.retain(|s| {
+        s.name
+            .to_lowercase()
+            .contains(&search_string.to_lowercase())
+    });
+
+    if secrets.is_empty() {
+        eprintln!("Your search did not return any results");
+        exit(1);
+    }
+
+    Ok(secrets)
 }
 
 /// Returns the secret value for a given ARN.
@@ -120,15 +122,10 @@ fn read_int() -> Result<usize> {
     Ok(input.trim().parse()?)
 }
 
-fn check_results(secrets: &Vec<Secret>) {
-    if secrets.is_empty() {
-        eprintln!("Your search did not return any results");
-        exit(1);
-    }
-}
-
-pub fn list_cmd() {
+/// Lists all secrets
+pub fn list_secrets() -> Result<()> {
     let output = AwsSM::new("list-secrets").run();
-    let secrets: Vec<Secret> = serde_json::from_str(&output).unwrap();
-    print_secret_table(&secrets);
+    let secrets: SecretList = serde_json::from_str(&output)?;
+    print_secret_table(&secrets.list);
+    Ok(())
 }
