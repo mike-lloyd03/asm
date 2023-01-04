@@ -20,17 +20,17 @@ enum Commands {
         #[clap(short, long)]
         description: Option<String>,
     },
-    /// Deletes an existing secret
+    /// Delete an existing secret
     #[clap(alias("delete"))]
     Delete {
         /// The name of the secret delete
         secret_name: String,
     },
-    /// Edits an existing secret
+    /// Edit an existing secret
     #[clap(alias("e"))]
     #[clap(alias("edit"))]
     Edit {
-        /// The name of the secret delete
+        /// The name of the secret to delete
         secret_name: String,
     },
     /// Get the ARN of a secret
