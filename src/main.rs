@@ -26,6 +26,13 @@ enum Commands {
         /// The name of the secret delete
         secret_name: String,
     },
+    /// Edits an existing secret
+    #[clap(alias("e"))]
+    #[clap(alias("edit"))]
+    Edit {
+        /// The name of the secret delete
+        secret_name: String,
+    },
     /// Get the ARN of a secret
     GetArn {
         /// The string to search on
@@ -59,6 +66,7 @@ fn main() {
             description,
         } => check_error(asm::create_secret(&secret_name, &description)),
         Commands::Delete { secret_name } => check_error(asm::delete_secret(&secret_name)),
+        Commands::Edit { secret_name } => check_error(asm::edit_secret(&secret_name)),
         Commands::GetArn { search_string } => {
             let secret = check_error(asm::select_secret(&search_string));
             println!("{}", secret.arn);

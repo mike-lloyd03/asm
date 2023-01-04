@@ -29,10 +29,7 @@ impl AwsSM {
                     .expect("Failed to parse stderr")
                     .to_string();
                 if !o.status.success() {
-                    eprintln!(
-                        "Failed to run aws command. Is the AWS CLI configured?\n{}",
-                        stderr
-                    );
+                    eprintln!("Failed to run aws command.\n{}", stderr);
                     exit(1)
                 }
                 stdout

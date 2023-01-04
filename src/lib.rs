@@ -1,3 +1,4 @@
+use std::fs;
 use std::io::{stdin, stdout, Write};
 use std::{env, path::Path, process::exit};
 
@@ -5,6 +6,7 @@ use anyhow::Result;
 use colored_json::to_colored_json_auto;
 use mktemp::Temp;
 use serde::Deserialize;
+use serde_json::to_string_pretty;
 use tabled::{object::Segment, Alignment, Modify, Style, Table};
 
 mod aws_sm;
@@ -64,7 +66,7 @@ pub fn search_secret(search_string: &str) -> Result<()> {
 /// user to choose which secret to retrieve if more than one secret is found.
 pub fn search_and_get_value(search_string: &str) -> Result<()> {
     let selected_secret = select_secret(search_string)?;
-    println!("{}", get_secret_value(&selected_secret.arn)?);
+    println!("{}", get_secret_value(&selected_secret.arn, true)?);
     Ok(())
 }
 
@@ -84,6 +86,8 @@ pub fn create_secret(secret_name: &str, description: &Option<String>) -> Result<
         &secret_file.to_str().expect("temp file should have path")
     );
 
+    edit_file(secret_file.as_path());
+
     let mut args = vec![
         "--name",
         secret_name,
@@ -93,10 +97,8 @@ pub fn create_secret(secret_name: &str, description: &Option<String>) -> Result<
     if let Some(desc) = description {
         args.extend(vec!["--description", desc])
     }
-
-    edit_file(secret_file.as_path());
-
     AwsSM::new("create-secret").args(args).run();
+
     println!("Created secret {}", secret_name);
 
     Ok(())
@@ -105,8 +107,8 @@ pub fn create_secret(secret_name: &str, description: &Option<String>) -> Result<
 /// Creates a new secret
 pub fn delete_secret(secret_name: &str) -> Result<()> {
     let secret = select_secret(secret_name)?;
-    println!(
-        "Are you sure you want to delete secret '{}' [y/N]?",
+    print!(
+        "Are you sure you want to delete secret '{}' [y/N]? ",
         secret.name
     );
     let resp = read_string()?;
@@ -118,6 +120,38 @@ pub fn delete_secret(secret_name: &str) -> Result<()> {
     } else {
         println!("Aborting...")
     }
+    Ok(())
+}
+
+/// Edits an existing secret
+pub fn edit_secret(secret_name: &str) -> Result<()> {
+    let secret = select_secret(secret_name)?;
+    let secret_file = Temp::new_file()?;
+    let secret_file_path = format!(
+        "file://{}",
+        &secret_file.to_str().expect("temp file should have path")
+    );
+
+    let secret_value = get_secret_value(&secret.arn, false)?;
+    fs::write(secret_file.as_path(), &secret_value).expect("failed to write file");
+    edit_file(secret_file.as_path());
+
+    let new_contents = fs::read(secret_file.as_path()).unwrap();
+
+    if new_contents == secret_value.into_bytes() {
+        println!("Secret not changed. Aborting...")
+    } else {
+        let args = vec![
+            "--secret-id",
+            secret.arn.as_str(),
+            "--secret-string",
+            secret_file_path.as_str(),
+        ];
+        AwsSM::new("update-secret").args(args).run();
+
+        println!("Updated secret {}", secret_name);
+    }
+
     Ok(())
 }
 
@@ -150,7 +184,7 @@ fn search_all_secrets(search_string: &str) -> Result<Vec<Secret>> {
 }
 
 /// Returns the secret value for a given ARN.
-pub fn get_secret_value(arn: &str) -> Result<String> {
+pub fn get_secret_value(arn: &str, colored: bool) -> Result<String> {
     let output = AwsSM::new("get-secret-value")
         .args(["--secret-id", arn])
         .run();
@@ -161,7 +195,13 @@ pub fn get_secret_value(arn: &str) -> Result<String> {
         match serde_json::from_str::<serde_json::Value>(
             secret.value.as_ref().unwrap_or(&"".to_string()),
         ) {
-            Ok(s) => to_colored_json_auto(&s)?,
+            Ok(s) => {
+                if colored {
+                    to_colored_json_auto(&s)?
+                } else {
+                    to_string_pretty(&s)?
+                }
+            }
             Err(_) => secret.value.unwrap_or_else(|| "".to_string()),
         },
     )
