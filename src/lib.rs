@@ -1,4 +1,5 @@
-use std::{env, process::exit};
+use std::io::{stdin, stdout, Write};
+use std::{env, path::Path, process::exit};
 
 use anyhow::Result;
 use colored_json::to_colored_json_auto;
@@ -93,7 +94,7 @@ pub fn create_secret(secret_name: &str, description: &Option<String>) -> Result<
         args.extend(vec!["--description", desc])
     }
 
-    edit_file(&secret_file);
+    edit_file(secret_file.as_path());
 
     AwsSM::new("create-secret").args(args).run();
     println!("Created secret {}", secret_name);
@@ -101,26 +102,23 @@ pub fn create_secret(secret_name: &str, description: &Option<String>) -> Result<
     Ok(())
 }
 
-fn edit_file(file: &Temp) {
-    let editor = get_editor();
-    let status = std::process::Command::new(editor)
-        .arg(file.as_path())
-        .status();
-
-    if status.is_err() {
-        eprint!("Failed to open editor");
-        exit(1)
+/// Creates a new secret
+pub fn delete_secret(secret_name: &str) -> Result<()> {
+    let secret = select_secret(secret_name)?;
+    println!(
+        "Are you sure you want to delete secret '{}' [y/N]?",
+        secret.name
+    );
+    let resp = read_string()?;
+    if resp == "y" || resp.to_lowercase().starts_with("yes") {
+        println!("Deleting '{}'", secret.name);
+        AwsSM::new("delete-secret")
+            .args(["--secret-id", secret.arn.as_str()])
+            .run();
+    } else {
+        println!("Aborting...")
     }
-}
-
-pub fn get_editor() -> String {
-    if let Ok(r) = env::var("VISUAL") {
-        return r;
-    }
-    if let Ok(r) = env::var("EDITOR") {
-        return r;
-    }
-    "vi".to_string()
+    Ok(())
 }
 
 /// Prints a table with a list of secrets
@@ -144,7 +142,7 @@ fn search_all_secrets(search_string: &str) -> Result<Vec<Secret>> {
     });
 
     if secrets.is_empty() {
-        eprintln!("Your search did not return any results");
+        eprintln!("There are no secrets match '{}'", search_string);
         exit(1);
     }
 
@@ -171,10 +169,41 @@ pub fn get_secret_value(arn: &str) -> Result<String> {
 
 /// Reads a usize integer from stdin.
 fn read_int() -> Result<usize> {
-    use std::io::{stdin, stdout, Write};
     let mut input = String::new();
 
     stdout().flush()?;
     stdin().read_line(&mut input)?;
     Ok(input.trim().parse()?)
+}
+
+/// Reads a string from stdin.
+fn read_string() -> Result<String> {
+    let mut input = String::new();
+
+    stdout().flush()?;
+    stdin().read_line(&mut input)?;
+    Ok(input.trim().parse()?)
+}
+
+// Opens a file in the user's preferred text editor.
+fn edit_file(file: &Path) {
+    let editor = get_editor();
+    let status = std::process::Command::new(editor).arg(file).status();
+
+    if status.is_err() {
+        eprint!("Failed to open editor");
+        exit(1)
+    }
+}
+
+/// Gets the user's prefered text editor from `VISUAL` or `EDITOR` variables. Defaults to `vi` if
+/// neither are set.
+pub fn get_editor() -> String {
+    if let Ok(r) = env::var("VISUAL") {
+        return r;
+    }
+    if let Ok(r) = env::var("EDITOR") {
+        return r;
+    }
+    "vi".to_string()
 }

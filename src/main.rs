@@ -20,6 +20,12 @@ enum Commands {
         #[clap(short, long)]
         description: Option<String>,
     },
+    /// Deletes an existing secret
+    #[clap(alias("delete"))]
+    Delete {
+        /// The name of the secret delete
+        secret_name: String,
+    },
     /// Get the ARN of a secret
     GetArn {
         /// The string to search on
@@ -52,6 +58,7 @@ fn main() {
             secret_name,
             description,
         } => check_error(asm::create_secret(&secret_name, &description)),
+        Commands::Delete { secret_name } => check_error(asm::delete_secret(&secret_name)),
         Commands::GetArn { search_string } => {
             let secret = check_error(asm::select_secret(&search_string));
             println!("{}", secret.arn);
