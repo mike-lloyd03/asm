@@ -1,7 +1,8 @@
-use std::process::exit;
+use std::{env, process::exit};
 
 use anyhow::Result;
 use colored_json::to_colored_json_auto;
+use mktemp::Temp;
 use serde::Deserialize;
 use tabled::{object::Segment, Alignment, Modify, Style, Table};
 
@@ -20,7 +21,7 @@ pub struct SecretList {
 /// Returns a secret from a list of secrets based on `search_string`. If more than one secret is
 /// returned from the search, the user is prompted to choose one.
 pub fn select_secret(search_string: &str) -> Result<Secret> {
-    let mut secrets = search_secrets(search_string)?;
+    let mut secrets = search_all_secrets(search_string)?;
     let i: usize;
 
     if secrets.len() > 1 {
@@ -52,18 +53,10 @@ pub fn select_secret(search_string: &str) -> Result<Secret> {
 
 /// Prints a list of secrets containing `search_string`
 pub fn search_secret(search_string: &str) -> Result<()> {
-    let secrets = search_secrets(search_string)?;
+    let secrets = search_all_secrets(search_string)?;
 
     print_secret_table(&secrets);
     Ok(())
-}
-
-/// Prints a table with a list of secrets
-fn print_secret_table(secrets: &Vec<Secret>) {
-    let table = Table::new(secrets)
-        .with(Style::rounded())
-        .with(Modify::new(Segment::all()).with(Alignment::left()));
-    println!("\n{}\n", table);
 }
 
 /// Gets a secret value by searching for secrets containing `search_string` and allowing the
@@ -74,8 +67,72 @@ pub fn search_and_get_value(search_string: &str) -> Result<()> {
     Ok(())
 }
 
+/// Lists all secrets
+pub fn list_secrets() -> Result<()> {
+    let output = AwsSM::new("list-secrets").run();
+    let secrets: SecretList = serde_json::from_str(&output)?;
+    print_secret_table(&secrets.list);
+    Ok(())
+}
+
+/// Creates a new secret
+pub fn create_secret(secret_name: &str, description: &Option<String>) -> Result<()> {
+    let secret_file = Temp::new_file()?;
+    let secret_file_path = format!(
+        "file://{}",
+        &secret_file.to_str().expect("temp file should have path")
+    );
+
+    let mut args = vec![
+        "--name",
+        secret_name,
+        "--secret-string",
+        secret_file_path.as_str(),
+    ];
+    if let Some(desc) = description {
+        args.extend(vec!["--description", desc])
+    }
+
+    edit_file(&secret_file);
+
+    AwsSM::new("create-secret").args(args).run();
+    println!("Created secret {}", secret_name);
+
+    Ok(())
+}
+
+fn edit_file(file: &Temp) {
+    let editor = get_editor();
+    let status = std::process::Command::new(editor)
+        .arg(file.as_path())
+        .status();
+
+    if status.is_err() {
+        eprint!("Failed to open editor");
+        exit(1)
+    }
+}
+
+pub fn get_editor() -> String {
+    if let Ok(r) = env::var("VISUAL") {
+        return r;
+    }
+    if let Ok(r) = env::var("EDITOR") {
+        return r;
+    }
+    "vi".to_string()
+}
+
+/// Prints a table with a list of secrets
+fn print_secret_table(secrets: &Vec<Secret>) {
+    let table = Table::new(secrets)
+        .with(Style::rounded())
+        .with(Modify::new(Segment::all()).with(Alignment::left()));
+    println!("\n{}\n", table);
+}
+
 /// Returns a list of secrets containing `search_string` in their name.
-fn search_secrets(search_string: &str) -> Result<Vec<Secret>> {
+fn search_all_secrets(search_string: &str) -> Result<Vec<Secret>> {
     let output = AwsSM::new("list-secrets").run();
     let secret_list: SecretList = serde_json::from_str(&output)?;
     let mut secrets: Vec<Secret> = secret_list.list;
@@ -120,12 +177,4 @@ fn read_int() -> Result<usize> {
     stdout().flush()?;
     stdin().read_line(&mut input)?;
     Ok(input.trim().parse()?)
-}
-
-/// Lists all secrets
-pub fn list_secrets() -> Result<()> {
-    let output = AwsSM::new("list-secrets").run();
-    let secrets: SecretList = serde_json::from_str(&output)?;
-    print_secret_table(&secrets.list);
-    Ok(())
 }

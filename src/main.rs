@@ -11,6 +11,15 @@ struct Cli {
 
 #[derive(Subcommand, Debug)]
 enum Commands {
+    /// Create a new secret
+    #[clap(alias("c"))]
+    #[clap(alias("create"))]
+    Create {
+        /// The name of the new secret
+        secret_name: String,
+        #[clap(short, long)]
+        description: Option<String>,
+    },
     /// Get the ARN of a secret
     GetArn {
         /// The string to search on
@@ -39,6 +48,10 @@ fn main() {
     let cli = Cli::parse();
 
     match cli.command {
+        Commands::Create {
+            secret_name,
+            description,
+        } => check_error(asm::create_secret(&secret_name, &description)),
         Commands::GetArn { search_string } => {
             let secret = check_error(asm::select_secret(&search_string));
             println!("{}", secret.arn);
