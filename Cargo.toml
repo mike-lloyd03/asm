@@ -1,6 +1,6 @@
 [package]
 name = "asm"
-version = "0.1.4"
+version = "0.1.5"
 edition = "2021"
 authors = ['Mike Lloyd']
 description = "A simple CLI tool for interacting with AWS Secrets Manager"

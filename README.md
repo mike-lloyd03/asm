@@ -76,5 +76,28 @@ $ asm delete dev/mySecret
 Are you sure you want to delete secret '{}' [y/N]? 
 ```
 
-## Todo
-- Better error handling
+### Describe a secret
+Describes the specified secret.
+ 
+```bash
+$ asm describe dev/mySecret
+```
+
+```json
+{
+  "ARN": "arn:aws:secretsmanager:us-west-1:123456:secret:dev/mySecret-abc123",
+  "CreatedDate": "2021-12-21T13:31:05.321000-08:00",
+  "LastAccessedDate": "2023-01-04T16:00:00-08:00",
+  "LastChangedDate": "2023-01-05T15:34:45.873000-08:00",
+  "Name": "dev/mySecret",
+  "Tags": [],
+  "VersionIdsToStages": {
+    "0beef02a-67f4-4e60-bcd9-00b946ef9dbf": [
+      "AWSCURRENT"
+    ],
+    "f921c1ea-6bd0-4e19-b35c-788f01b52d67": [
+      "AWSPREVIOUS"
+    ]
+  }
+}
+```
