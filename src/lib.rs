@@ -109,8 +109,8 @@ pub fn create_secret(secret_name: &str, description: &Option<String>) -> Result<
 }
 
 /// Creates a new secret
-pub fn delete_secret(secret_name: &str) -> Result<()> {
-    let secret = select_secret(secret_name)?;
+pub fn delete_secret(search_string: &str) -> Result<()> {
+    let secret = select_secret(search_string)?;
     print!(
         "Are you sure you want to delete secret '{}' [y/N]? ",
         secret.name
@@ -128,8 +128,8 @@ pub fn delete_secret(secret_name: &str) -> Result<()> {
 }
 
 /// Edits an existing secret
-pub fn edit_secret(secret_name: &str) -> Result<()> {
-    let secret = select_secret(secret_name)?;
+pub fn edit_secret(search_string: &str) -> Result<()> {
+    let secret = select_secret(search_string)?;
     let secret_file = Temp::new_file()?;
     let secret_file_path = format!(
         "file://{}",
@@ -153,9 +153,20 @@ pub fn edit_secret(secret_name: &str) -> Result<()> {
         ];
         AwsSM::new("update-secret").args(args).run();
 
-        println!("Updated secret {}", secret_name);
+        println!("Updated secret {}", secret.name);
     }
 
+    Ok(())
+}
+///
+/// Describes an existing secret
+pub fn describe_secret(search_string: &str) -> Result<()> {
+    let secret = select_secret(search_string)?;
+    let output = AwsSM::new("describe-secret")
+        .args(["--secret-id", &secret.arn])
+        .run();
+    let secret_details = serde_json::from_str(&output)?;
+    println!("{}", to_colored_json_auto(&secret_details).unwrap());
     Ok(())
 }
 

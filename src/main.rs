@@ -23,20 +23,28 @@ enum Commands {
     /// Delete an existing secret
     #[clap(alias("delete"))]
     Delete {
-        /// The name of the secret delete
+        /// The name of the secret to delete
+        secret_name: String,
+    },
+    /// Describe an existing secret
+    #[clap(alias("d"))]
+    #[clap(alias("desc"))]
+    #[clap(alias("describe"))]
+    Describe {
+        /// The name of the secret to describe
         secret_name: String,
     },
     /// Edit an existing secret
     #[clap(alias("e"))]
     #[clap(alias("edit"))]
     Edit {
-        /// The name of the secret to delete
+        /// The name of the secret to edit
         secret_name: String,
     },
     /// Get the ARN of a secret
     GetArn {
-        /// The string to search on
-        search_string: String,
+        /// The name of the secret
+        secret_name: String,
     },
     /// Get the value of a secret
     #[clap(alias("g"))]
@@ -66,9 +74,10 @@ fn main() {
             description,
         } => check_error(asm::create_secret(&secret_name, &description)),
         Commands::Delete { secret_name } => check_error(asm::delete_secret(&secret_name)),
+        Commands::Describe { secret_name } => check_error(asm::describe_secret(&secret_name)),
         Commands::Edit { secret_name } => check_error(asm::edit_secret(&secret_name)),
-        Commands::GetArn { search_string } => {
-            let secret = check_error(asm::select_secret(&search_string));
+        Commands::GetArn { secret_name } => {
+            let secret = check_error(asm::select_secret(&secret_name));
             println!("{}", secret.arn);
         }
         Commands::GetValue { search_string } => {
