@@ -191,7 +191,7 @@ fn search_all_secrets(search_string: &str) -> Result<Vec<Secret>> {
     });
 
     if secrets.is_empty() {
-        eprintln!("There are no secrets match '{}'", search_string);
+        eprintln!("There are no secrets matching \"{}\"", search_string);
         exit(1);
     }
 
