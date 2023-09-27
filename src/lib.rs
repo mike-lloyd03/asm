@@ -89,12 +89,7 @@ pub fn create_secret(secret_name: &str, description: &Option<String>) -> Result<
     edit_file(secret_file.as_path());
 
     if Path::exists(secret_file.as_path()) {
-        let mut args = vec![
-            "--name",
-            secret_name,
-            "--secret-string",
-            secret_file_path.as_str(),
-        ];
+        let mut args = vec!["--name", secret_name, "--secret-string", &secret_file_path];
         if let Some(desc) = description {
             args.extend(vec!["--description", desc])
         }
@@ -217,7 +212,7 @@ pub fn get_secret_value(arn: &str, colored: bool) -> Result<String> {
                     to_string_pretty(&s)?
                 }
             }
-            Err(_) => secret.value.unwrap_or_else(|| "".to_string()),
+            Err(_) => secret.value.unwrap_or_default(),
         },
     )
 }
