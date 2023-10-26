@@ -123,7 +123,7 @@ pub fn delete_secret(search_string: &str) -> Result<()> {
 }
 
 /// Edits an existing secret
-pub fn edit_secret(search_string: &str) -> Result<()> {
+pub fn edit_secret(search_string: &str, edit_description: bool) -> Result<()> {
     let secret = select_secret(search_string)?;
     let secret_file = Temp::new_file()?;
     let secret_file_path = format!(
@@ -131,24 +131,46 @@ pub fn edit_secret(search_string: &str) -> Result<()> {
         &secret_file.to_str().expect("temp file should have path")
     );
 
-    let secret_value = get_secret_value(&secret.arn, false)?;
-    fs::write(secret_file.as_path(), &secret_value).expect("failed to write file");
-    edit_file(secret_file.as_path());
+    if !edit_description {
+        let secret_value = get_secret_value(&secret.arn, false)?;
+        fs::write(secret_file.as_path(), &secret_value).expect("failed to write file");
+        edit_file(secret_file.as_path());
 
-    let new_contents = fs::read(secret_file.as_path()).unwrap();
+        let new_contents = fs::read(secret_file.as_path()).unwrap();
 
-    if new_contents == secret_value.into_bytes() {
-        println!("Secret not changed. Aborting...")
+        if new_contents == secret_value.into_bytes() {
+            println!("Secret not changed. Aborting...")
+        } else {
+            let args = vec![
+                "--secret-id",
+                secret.arn.as_str(),
+                "--secret-string",
+                secret_file_path.as_str(),
+            ];
+            AwsSM::new("update-secret").args(args).run();
+
+            println!("Updated secret {}", secret.name);
+        }
     } else {
-        let args = vec![
-            "--secret-id",
-            secret.arn.as_str(),
-            "--secret-string",
-            secret_file_path.as_str(),
-        ];
-        AwsSM::new("update-secret").args(args).run();
+        let desc = secret.description.unwrap_or_default();
+        fs::write(secret_file.as_path(), desc.clone()).expect("failed to write file");
+        edit_file(secret_file.as_path());
 
-        println!("Updated secret {}", secret.name);
+        let new_contents = fs::read(secret_file.as_path()).unwrap();
+
+        if new_contents == desc.into_bytes() {
+            println!("Description not changed. Aborting...")
+        } else {
+            let args = vec![
+                "--secret-id",
+                secret.arn.as_str(),
+                "--description",
+                secret_file_path.as_str(),
+            ];
+            AwsSM::new("update-secret").args(args).run();
+
+            println!("Updated secret description {}", secret.name);
+        }
     }
 
     Ok(())

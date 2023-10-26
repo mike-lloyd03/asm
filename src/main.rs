@@ -40,6 +40,9 @@ enum Commands {
     Edit {
         /// The name of the secret to edit
         secret_name: String,
+        /// Edit the secret description
+        #[clap(short, long)]
+        description: bool,
     },
     /// Get the ARN of a secret
     GetArn {
@@ -75,7 +78,10 @@ fn main() {
         } => check_error(asm::create_secret(&secret_name, &description)),
         Commands::Delete { secret_name } => check_error(asm::delete_secret(&secret_name)),
         Commands::Describe { secret_name } => check_error(asm::describe_secret(&secret_name)),
-        Commands::Edit { secret_name } => check_error(asm::edit_secret(&secret_name)),
+        Commands::Edit {
+            secret_name,
+            description,
+        } => check_error(asm::edit_secret(&secret_name, description)),
         Commands::GetArn { secret_name } => {
             let secret = check_error(asm::select_secret(&secret_name));
             println!("{}", secret.arn);
