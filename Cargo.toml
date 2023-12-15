@@ -9,7 +9,7 @@ description = "A simple CLI tool for interacting with AWS Secrets Manager"
 anyhow = "1.0.56"
 clap = { version = "3.1.5", features = ["derive"] }
 colored_json = "3.3.0"
-mktemp = "0.5.0"
 serde = { version = "1.0.136", features = ["derive"] }
 serde_json = "1.0.79"
 tabled = "0.7.0"
+tempfile = "3.8.1"

@@ -4,7 +4,6 @@ use std::{env, path::Path, process::exit};
 
 use anyhow::Result;
 use colored_json::to_colored_json_auto;
-use mktemp::Temp;
 use serde::Deserialize;
 use serde_json::to_string_pretty;
 use tabled::{object::Segment, Alignment, Modify, Style, Table};
@@ -14,6 +13,7 @@ mod secret;
 
 pub use aws_sm::AwsSM;
 pub use secret::*;
+use tempfile::{Builder, NamedTempFile};
 
 #[derive(Debug, Deserialize)]
 pub struct SecretList {
@@ -80,15 +80,18 @@ pub fn list_secrets() -> Result<()> {
 
 /// Creates a new secret
 pub fn create_secret(secret_name: &str, description: &Option<String>) -> Result<()> {
-    let secret_file = Temp::new_path();
+    let secret_file = create_temp_file(Some(".json"))?;
     let secret_file_path = format!(
         "file://{}",
-        &secret_file.to_str().expect("temp file should have path")
+        &secret_file
+            .path()
+            .to_str()
+            .expect("temp file should have path")
     );
 
-    edit_file(secret_file.as_path());
+    edit_file(secret_file.path());
 
-    if Path::exists(secret_file.as_path()) {
+    if Path::exists(secret_file.path()) {
         let mut args = vec!["--name", secret_name, "--secret-string", &secret_file_path];
         if let Some(desc) = description {
             args.extend(vec!["--description", desc])
@@ -125,18 +128,21 @@ pub fn delete_secret(search_string: &str) -> Result<()> {
 /// Edits an existing secret
 pub fn edit_secret(search_string: &str, edit_description: bool) -> Result<()> {
     let secret = select_secret(search_string)?;
-    let secret_file = Temp::new_file()?;
+    let secret_file = create_temp_file(Some(".json"))?;
     let secret_file_path = format!(
         "file://{}",
-        &secret_file.to_str().expect("temp file should have path")
+        &secret_file
+            .path()
+            .to_str()
+            .expect("temp file should have path")
     );
 
     if !edit_description {
         let secret_value = get_secret_value(&secret.arn, false)?;
-        fs::write(secret_file.as_path(), &secret_value).expect("failed to write file");
-        edit_file(secret_file.as_path());
+        fs::write(secret_file.path(), &secret_value).expect("failed to write file");
+        edit_file(secret_file.path());
 
-        let new_contents = fs::read(secret_file.as_path()).unwrap();
+        let new_contents = fs::read(secret_file.path()).unwrap();
 
         if new_contents == secret_value.into_bytes() {
             println!("Secret not changed. Aborting...")
@@ -153,10 +159,10 @@ pub fn edit_secret(search_string: &str, edit_description: bool) -> Result<()> {
         }
     } else {
         let desc = secret.description.unwrap_or_default();
-        fs::write(secret_file.as_path(), desc.clone()).expect("failed to write file");
-        edit_file(secret_file.as_path());
+        fs::write(secret_file.path(), desc.clone()).expect("failed to write file");
+        edit_file(secret_file.path());
 
-        let new_contents = fs::read(secret_file.as_path()).unwrap();
+        let new_contents = fs::read(secret_file.path()).unwrap();
 
         if new_contents == desc.into_bytes() {
             println!("Description not changed. Aborting...")
@@ -278,4 +284,13 @@ pub fn get_editor() -> String {
         return r;
     }
     "vi".to_string()
+}
+
+// Creates a temporary file with the optionally provided suffix.
+fn create_temp_file(suffix: Option<&str>) -> Result<NamedTempFile> {
+    let mut builder = Builder::new();
+    if let Some(s) = suffix {
+        builder.suffix(s);
+    };
+    Ok(builder.tempfile()?)
 }
