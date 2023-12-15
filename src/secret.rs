@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use tabled::Tabled;
+use tabled::{object::Segment, Alignment, Modify, Style, Table, Tabled};
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Secret {
@@ -26,5 +26,20 @@ impl Tabled for Secret {
 
     fn headers() -> Vec<String> {
         vec!["Name".to_string(), "Description".to_string()]
+    }
+}
+
+#[derive(Debug, Deserialize)]
+pub struct SecretList {
+    #[serde(rename = "SecretList")]
+    pub list: Vec<Secret>,
+}
+
+impl SecretList {
+    pub fn print_table(&self) {
+        let table = Table::new(&self.list)
+            .with(Style::rounded())
+            .with(Modify::new(Segment::all()).with(Alignment::left()));
+        println!("\n{}\n", table);
     }
 }

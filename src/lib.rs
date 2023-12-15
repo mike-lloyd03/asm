@@ -6,47 +6,42 @@ use anyhow::Result;
 use colored_json::to_colored_json_auto;
 use dialoguer::theme::ColorfulTheme;
 use dialoguer::FuzzySelect;
-use serde::Deserialize;
 use serde_json::to_string_pretty;
-use tabled::{object::Segment, Alignment, Modify, Style, Table};
 
 mod aws_sm;
 mod secret;
 
 pub use aws_sm::AwsSM;
-pub use secret::*;
+pub use secret::{Secret, SecretList};
 use tempfile::{Builder, NamedTempFile};
-
-#[derive(Debug, Deserialize)]
-pub struct SecretList {
-    #[serde(rename = "SecretList")]
-    pub list: Vec<Secret>,
-}
 
 /// Returns a secret from a list of secrets based on `search_string`. If more than one secret is
 /// returned from the search, the user is prompted to choose one.
 pub fn select_secret(search_string: &str) -> Result<Secret> {
     let mut secrets = search_all_secrets(search_string)?;
-    let items: Vec<String> = secrets.iter().map(|s| s.name.clone()).collect();
+    let items: Vec<String> = secrets.list.iter().map(|s| s.name.clone()).collect();
 
-    let i = if secrets.len() > 1 {
+    let i = if secrets.list.len() > 1 {
         FuzzySelect::with_theme(&ColorfulTheme::default())
             .with_prompt("Select secret")
             .items(&items)
             .interact()?
     } else {
-        eprintln!("{}", secrets.first().expect("should be one secret").name);
+        eprintln!(
+            "{}",
+            secrets.list.first().expect("should be one secret").name
+        );
         0
     };
 
-    Ok(secrets.remove(i))
+    Ok(secrets.list.remove(i))
 }
 
 /// Prints a list of secrets containing `search_string`
 pub fn search_secret(search_string: &str) -> Result<()> {
     let secrets = search_all_secrets(search_string)?;
 
-    print_secret_table(&secrets);
+    secrets.print_table();
     Ok(())
 }
 
@@ -62,7 +57,7 @@ pub fn search_and_get_value(search_string: &str) -> Result<()> {
 pub fn list_secrets() -> Result<()> {
     let output = AwsSM::new("list-secrets").run();
     let secrets: SecretList = serde_json::from_str(&output)?;
-    print_secret_table(&secrets.list);
+    secrets.print_table();
     Ok(())
 }
 
@@ -176,32 +171,25 @@ pub fn describe_secret(search_string: &str) -> Result<()> {
     let output = AwsSM::new("describe-secret")
         .args(["--secret-id", &secret.arn])
         .run();
+
     let secret_details = serde_json::from_str(&output)?;
-    println!("{}", to_colored_json_auto(&secret_details).unwrap());
+    println!("{}", to_colored_json_auto(&secret_details)?);
+
     Ok(())
 }
 
-/// Prints a table with a list of secrets
-fn print_secret_table(secrets: &Vec<Secret>) {
-    let table = Table::new(secrets)
-        .with(Style::rounded())
-        .with(Modify::new(Segment::all()).with(Alignment::left()));
-    println!("\n{}\n", table);
-}
-
 /// Returns a list of secrets containing `search_string` in their name.
-fn search_all_secrets(search_string: &str) -> Result<Vec<Secret>> {
+fn search_all_secrets(search_string: &str) -> Result<SecretList> {
     let output = AwsSM::new("list-secrets").run();
-    let secret_list: SecretList = serde_json::from_str(&output)?;
-    let mut secrets: Vec<Secret> = secret_list.list;
+    let mut secrets: SecretList = serde_json::from_str(&output)?;
 
-    secrets.retain(|s| {
+    secrets.list.retain(|s| {
         s.name
             .to_lowercase()
             .contains(&search_string.to_lowercase())
     });
 
-    if secrets.is_empty() {
+    if secrets.list.is_empty() {
         eprintln!("There are no secrets matching \"{}\"", search_string);
         exit(1);
     }
@@ -231,15 +219,6 @@ pub fn get_secret_value(arn: &str, colored: bool) -> Result<String> {
             Err(_) => secret.value.unwrap_or_default(),
         },
     )
-}
-
-/// Reads a usize integer from stdin.
-fn read_int() -> Result<usize> {
-    let mut input = String::new();
-
-    stdout().flush()?;
-    stdin().read_line(&mut input)?;
-    Ok(input.trim().parse()?)
 }
 
 /// Reads a string from stdin.
