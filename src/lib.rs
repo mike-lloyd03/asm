@@ -4,6 +4,8 @@ use std::{env, path::Path, process::exit};
 
 use anyhow::Result;
 use colored_json::to_colored_json_auto;
+use dialoguer::theme::ColorfulTheme;
+use dialoguer::FuzzySelect;
 use serde::Deserialize;
 use serde_json::to_string_pretty;
 use tabled::{object::Segment, Alignment, Modify, Style, Table};
@@ -25,32 +27,18 @@ pub struct SecretList {
 /// returned from the search, the user is prompted to choose one.
 pub fn select_secret(search_string: &str) -> Result<Secret> {
     let mut secrets = search_all_secrets(search_string)?;
-    let i: usize;
+    let items: Vec<String> = secrets.iter().map(|s| s.name.clone()).collect();
 
-    if secrets.len() > 1 {
-        eprintln!("Multiple secrets were found");
-        secrets.iter().enumerate().for_each(|(i, s)| {
-            eprintln!("{}: {}", i, s.name);
-        });
-        eprint!("\nSelect secret: ");
-        match read_int() {
-            Ok(input) => {
-                let max_idx = secrets.len() - 1;
-                if input <= max_idx {
-                    i = input;
-                } else {
-                    eprintln!("Please enter a value between 0 and {}", max_idx);
-                    exit(1);
-                }
-            }
-            Err(_) => {
-                eprintln!("Please enter an integer value");
-                exit(1);
-            }
-        }
+    let i = if secrets.len() > 1 {
+        FuzzySelect::with_theme(&ColorfulTheme::default())
+            .with_prompt("Select secret")
+            .items(&items)
+            .interact()?
     } else {
-        i = 0;
-    }
+        eprintln!("{}", secrets.first().expect("should be one secret").name);
+        0
+    };
+
     Ok(secrets.remove(i))
 }
 
