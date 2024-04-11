@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use tabled::{object::Segment, Alignment, Modify, Style, Table, Tabled};
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct Secret {
     #[serde(rename = "ARN")]
     pub arn: String,
@@ -36,6 +36,10 @@ pub struct SecretList {
 }
 
 impl SecretList {
+    pub fn new(list: Vec<Secret>) -> Self {
+        Self { list }
+    }
+
     pub fn print_table(&self) {
         let table = Table::new(&self.list)
             .with(Style::rounded())
